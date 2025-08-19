@@ -34,16 +34,15 @@ def chatid_command(bot, update):
     
     # Buat inline keyboard dengan tombol copy
     keyboard = [
-        [InlineKeyboardButton("📋 Copy Chat ID", callback_data="copy_chat_{}".format(chat_id))],
-        [InlineKeyboardButton("👤 Copy User ID", callback_data="copy_user_{}".format(user_id))]
+        [InlineKeyboardButton("📋 Tampilkan Chat ID", callback_data="show_chat_{}".format(chat_id))],
+        [InlineKeyboardButton("👤 Tampilkan User ID", callback_data="show_user_{}".format(user_id))],
+        [InlineKeyboardButton("🔄 Tampilkan Semua", callback_data="show_all_{}_{}".format(chat_id, user_id))]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     update.message.reply_text(
-        "📊 *Informasi ID Anda:*\n\n"
-        "💬 Chat ID: `{}`\n"
-        "👤 User ID: `{}`\n\n"
-        "_Klik tombol di bawah untuk copy ID_".format(chat_id, user_id),
+        "📊 *Informasi ID Anda*\n\n"
+        "Klik tombol di bawah untuk menampilkan ID dalam format yang mudah di-copy:",
         parse_mode='Markdown',
         reply_markup=reply_markup
     )
@@ -51,34 +50,69 @@ def chatid_command(bot, update):
 def button_callback(bot, update):
     """Handle button callback"""
     query = update.callback_query
-    query.answer("✅ ID ditampilkan di bawah!")  # Acknowledge the callback
     
-    if query.data.startswith("copy_chat_"):
-        chat_id = query.data.replace("copy_chat_", "")
-        # Kirim pesan baru dengan ID yang mudah di-copy
+    if query.data.startswith("show_chat_"):
+        chat_id = query.data.replace("show_chat_", "")
+        query.answer("💬 Chat ID dikirim!")
+        
+        # Kirim dalam beberapa format untuk kemudahan copy
         bot.send_message(
             chat_id=query.message.chat_id,
-            text="� *Chat ID untuk di-copy:*\n\n`{}`\n\n_Tekan dan tahan pada angka di atas untuk copy_".format(chat_id),
-            parse_mode='Markdown'
+            text="📋 **CHAT ID:**"
         )
-        # Kirim juga dalam format plain text
         bot.send_message(
             chat_id=query.message.chat_id,
-            text=chat_id
+            text=chat_id,
+            reply_to_message_id=query.message.message_id
+        )
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text="`{}`".format(chat_id),
+            parse_mode='Markdown'
         )
         
-    elif query.data.startswith("copy_user_"):
-        user_id = query.data.replace("copy_user_", "")
-        # Kirim pesan baru dengan ID yang mudah di-copy
+    elif query.data.startswith("show_user_"):
+        user_id = query.data.replace("show_user_", "")
+        query.answer("👤 User ID dikirim!")
+        
         bot.send_message(
             chat_id=query.message.chat_id,
-            text="👤 *User ID untuk di-copy:*\n\n`{}`\n\n_Tekan dan tahan pada angka di atas untuk copy_".format(user_id),
+            text="👤 **USER ID:**"
+        )
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text=user_id,
+            reply_to_message_id=query.message.message_id
+        )
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text="`{}`".format(user_id),
             parse_mode='Markdown'
         )
-        # Kirim juga dalam format plain text
+        
+    elif query.data.startswith("show_all_"):
+        data_parts = query.data.replace("show_all_", "").split("_")
+        chat_id = data_parts[0]
+        user_id = data_parts[1]
+        query.answer("📋 Semua ID dikirim!")
+        
         bot.send_message(
             chat_id=query.message.chat_id,
-            text=user_id
+            text="📊 **SEMUA ID ANDA:**"
+        )
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text="💬 Chat ID: {}".format(chat_id)
+        )
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text="👤 User ID: {}".format(user_id)
+        )
+        # Format monospace untuk copy mudah
+        bot.send_message(
+            chat_id=query.message.chat_id,
+            text="```\nChat ID: {}\nUser ID: {}\n```".format(chat_id, user_id),
+            parse_mode='Markdown'
         )
 
 def text_message(bot, update):
@@ -96,7 +130,7 @@ def error_handler(bot, update, error):
 
 def main():
     """Main function"""
-    print("Starting bot...")
+    print("Starting bot with better copy buttons...")
     
     # Buat Updater dengan token (tanpa use_context untuk versi lama)
     updater = Updater(TOKEN)
