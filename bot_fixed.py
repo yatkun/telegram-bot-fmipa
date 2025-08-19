@@ -4,6 +4,8 @@ import os
 import logging
 import datetime
 import re
+import threading
+import time
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -13,6 +15,9 @@ logger = logging.getLogger(__name__)
 # Token bot
 TOKEN = os.getenv('TELEGRAM_TOKEN', "8446128745:AAGRBVniJe6PGWjSBrZvyZpHJnDLmqrjPrc")
 USER_BOT = os.getenv('BOT_USERNAME', "@fmipausb_bot")
+
+# Global variable untuk bot
+global_bot = None
 
 def start_command(bot, update):
     """Handle /mulai command"""
@@ -52,9 +57,6 @@ def help_command(bot, update):
         "`/reminder 2024-12-25 Hari Natal`",
         parse_mode='Markdown'
     )
-
-# Global variable untuk menyimpan updater
-bot_updater = None
 
 def reminder_command(bot, update):
     """Handle /reminder command"""
@@ -108,51 +110,51 @@ def reminder_command(bot, update):
         )
         return
     
-    # Set reminder menggunakan job queue
+    # Set reminder menggunakan threading (alternatif untuk job queue)
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
     
-    # Simpan reminder info
-    job_context = {
-        'chat_id': chat_id,
-        'user_id': user_id,
-        'message': message,
-        'original_time': time_str
-    }
+    # Hitung waktu reminder
+    target_time = datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)
     
-    # Buat job menggunakan global updater
-    global bot_updater
-    if bot_updater and hasattr(bot_updater, 'job_queue') and bot_updater.job_queue:
-        job = bot_updater.job_queue.run_once(send_reminder, delay_seconds, context=job_context)
+    # Buat thread untuk reminder
+    reminder_thread = threading.Thread(
+        target=send_reminder_threaded,
+        args=(bot, chat_id, message, delay_seconds)
+    )
+    reminder_thread.daemon = True  # Thread akan mati ketika program utama mati
+    reminder_thread.start()
+    
+    update.message.reply_text(
+        "✅ *Reminder berhasil dibuat!*\n\n"
+        "⏰ **Waktu:** {}\n"
+        "💬 **Pesan:** {}\n"
+        "🕐 **Akan diingatkan pada:**\n`{}`\n\n"
+        "_Reminder akan berjalan di background_".format(
+            time_str, 
+            message, 
+            target_time.strftime("%Y-%m-%d %H:%M:%S")
+        ),
+        parse_mode='Markdown'
+    )
+
+def send_reminder_threaded(bot, chat_id, message, delay_seconds):
+    """Kirim reminder menggunakan thread"""
+    try:
+        # Tunggu selama delay_seconds
+        time.sleep(delay_seconds)
         
-        # Hitung waktu reminder
-        target_time = datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)
-        
-        update.message.reply_text(
-            "✅ *Reminder berhasil dibuat!*\n\n"
-            "⏰ **Waktu:** {}\n"
-            "💬 **Pesan:** {}\n"
-            "🕐 **Akan diingatkan pada:**\n`{}`".format(
-                time_str, 
-                message, 
-                target_time.strftime("%Y-%m-%d %H:%M:%S")
-            ),
+        # Kirim pesan reminder
+        bot.send_message(
+            chat_id=chat_id,
+            text="🔔 *REMINDER ALARM!*\n\n"
+                 "⏰ **Waktunya:** {}\n\n"
+                 "Jangan lupa! 😊\n\n"
+                 "_Reminder ini telah selesai._".format(message),
             parse_mode='Markdown'
         )
-    else:
-        # Fallback: simpan untuk reminder manual (tidak ideal tapi tetap berfungsi)
-        update.message.reply_text(
-            "⚠️ *Reminder disimpan (mode sederhana)*\n\n"
-            "⏰ **Waktu:** {}\n"
-            "💬 **Pesan:** {}\n"
-            "🕐 **Target:** {}\n\n"
-            "_Catatan: Reminder mungkin tidak otomatis karena keterbatasan sistem._".format(
-                time_str, 
-                message, 
-                (datetime.datetime.now() + datetime.timedelta(seconds=delay_seconds)).strftime("%Y-%m-%d %H:%M:%S")
-            ),
-            parse_mode='Markdown'
-        )
+    except Exception as e:
+        logger.error("Error sending reminder: {}".format(e))
 
 def parse_time(time_str):
     """Parse string waktu menjadi detik"""
@@ -195,21 +197,6 @@ def parse_time(time_str):
         return None
     except:
         return None
-
-def send_reminder(bot, job):
-    """Kirim pesan reminder"""
-    context = job.context
-    chat_id = context['chat_id']
-    message = context['message']
-    
-    bot.send_message(
-        chat_id=chat_id,
-        text="🔔 *REMINDER ALARM!*\n\n"
-             "⏰ **Waktunya:** {}\n\n"
-             "Jangan lupa! 😊\n\n"
-             "_Reminder ini telah selesai._".format(message),
-        parse_mode='Markdown'
-    )
 
 def jadwal_command(bot, update):
     """Handle /jadwal command - lihat reminder aktif"""
@@ -289,12 +276,12 @@ def button_callback(bot, update):
             text="⏰ *Cara Menggunakan Reminder:*\n\n"
                  "*Format:* `/reminder [waktu] [pesan]`\n\n"
                  "*Contoh Penggunaan:*\n"
+                 "• `/reminder 1m Test reminder`\n"
                  "• `/reminder 5m Minum obat`\n"
                  "• `/reminder 30m Meeting tim`\n"
                  "• `/reminder 2h Istirahat`\n"
                  "• `/reminder 1d Deadline tugas`\n"
-                 "• `/reminder 15:30 Rapat sore`\n"
-                 "• `/reminder 2024-12-25 Hari Natal`\n\n"
+                 "• `/reminder 15:30 Rapat sore`\n\n"
                  "*Format waktu yang didukung:*\n"
                  "• `m` = menit (contoh: 5m, 30m)\n"
                  "• `h` = jam (contoh: 1h, 2h)\n"
@@ -307,7 +294,6 @@ def button_callback(bot, update):
         
     elif query.data == "show_help":
         query.answer("❓ Menampilkan bantuan")
-        # Kirim pesan bantuan langsung, bukan memanggil help_command
         bot.send_message(
             chat_id=query.message.chat_id,
             text="📚 *Daftar perintah yang tersedia:*\n\n"
@@ -379,15 +365,16 @@ def error_handler(bot, update, error):
 
 def main():
     """Main function"""
-    global bot_updater
+    global global_bot
     
-    print("Starting Bot FMIPA with Reminder feature...")
+    print("Starting Bot FMIPA with Threading-based Reminder...")
     
     # Buat Updater dengan token
-    bot_updater = Updater(TOKEN)
+    updater = Updater(TOKEN)
+    global_bot = updater.bot
     
     # Dapatkan dispatcher
-    dp = bot_updater.dispatcher
+    dp = updater.dispatcher
     
     # Command handlers
     dp.add_handler(CommandHandler("mulai", start_command))
@@ -410,12 +397,12 @@ def main():
     dp.add_error_handler(error_handler)
     
     # Start polling
-    print("Bot is running... Press Ctrl+C to stop")
-    print("Job queue available:", hasattr(bot_updater, 'job_queue') and bot_updater.job_queue is not None)
-    bot_updater.start_polling(poll_interval=1)
+    print("Bot is running with threading-based reminders...")
+    print("Try: /reminder 1m Test reminder")
+    updater.start_polling(poll_interval=1)
     
     # Run until Ctrl+C
-    bot_updater.idle()
+    updater.idle()
 
 if __name__ == "__main__":
     main()
