@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv('TELEGRAM_TOKEN', "8446128745:AAGRBVniJe6PGWjSBrZvyZpHJnDLmqrjPrc")
 USER_BOT = os.getenv('BOT_USERNAME', "@fmipausb_bot")
 
-def start_command(update, context):
+def start_command(bot, update):
     """Handle /mulai command"""
     update.message.reply_text(
         "Selamat datang di bot ini! Gunakan /bantuan untuk melihat daftar perintah yang tersedia."
     )
 
-def help_command(update, context):
+def help_command(bot, update):
     """Handle /bantuan command"""
     update.message.reply_text(
         "Daftar perintah yang tersedia:\n"
@@ -27,23 +27,23 @@ def help_command(update, context):
         "/chatid - Menampilkan chat ID Anda\n"
     )
 
-def chatid_command(update, context):
+def chatid_command(bot, update):
     """Handle /chatid command"""
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    chat_id = update.message.chat_id
+    user_id = update.message.from_user.id
     update.message.reply_text(
         "Chat ID: {}\nUser ID: {}".format(chat_id, user_id)
     )
 
-def text_message(update, context):
+def text_message(bot, update):
     """Handle text messages"""
     user_message = update.message.text
     response = "Anda mengirim pesan: {}".format(user_message)
     update.message.reply_text(response)
 
-def error_handler(update, context):
+def error_handler(bot, update, error):
     """Handle errors"""
-    error_message = "Terjadi kesalahan: {}".format(context.error)
+    error_message = "Terjadi kesalahan: {}".format(error)
     logger.error(error_message)
     if update:
         update.message.reply_text(error_message)
@@ -52,8 +52,8 @@ def main():
     """Main function"""
     print("Starting bot...")
     
-    # Buat Updater dengan token
-    updater = Updater(TOKEN, use_context=True)
+    # Buat Updater dengan token (tanpa use_context untuk versi lama)
+    updater = Updater(TOKEN)
     
     # Dapatkan dispatcher
     dp = updater.dispatcher
