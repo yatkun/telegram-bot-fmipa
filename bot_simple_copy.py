@@ -1,5 +1,5 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import os
 import logging
 
@@ -28,47 +28,22 @@ def help_command(bot, update):
     )
 
 def chatid_command(bot, update):
-    """Handle /chatid command"""
+    """Handle /chatid command dengan format yang mudah di-copy"""
     chat_id = update.message.chat_id
     user_id = update.message.from_user.id
     
-    # Buat inline keyboard dengan tombol copy
-    keyboard = [
-        [InlineKeyboardButton("📋 Copy Chat ID", callback_data="copy_chat_{}".format(chat_id))],
-        [InlineKeyboardButton("👤 Copy User ID", callback_data="copy_user_{}".format(user_id))]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
+    # Format dengan monospace agar mudah di-copy
     update.message.reply_text(
         "📊 *Informasi ID Anda:*\n\n"
-        "💬 Chat ID: `{}`\n"
-        "👤 User ID: `{}`\n\n"
-        "_Klik tombol di bawah untuk copy ID_".format(chat_id, user_id),
-        parse_mode='Markdown',
-        reply_markup=reply_markup
+        "💬 Chat ID:\n`{}`\n\n"
+        "👤 User ID:\n`{}`\n\n"
+        "_Tekan dan tahan pada ID di atas untuk copy_".format(chat_id, user_id),
+        parse_mode='Markdown'
     )
-
-def button_callback(bot, update):
-    """Handle button callback"""
-    query = update.callback_query
-    query.answer()  # Acknowledge the callback
     
-    if query.data.startswith("copy_chat_"):
-        chat_id = query.data.replace("copy_chat_", "")
-        query.edit_message_text(
-            "✅ *Chat ID berhasil ditampilkan!*\n\n"
-            "💬 Chat ID: `{}`\n\n"
-            "_Tekan dan tahan pada ID di atas untuk copy_".format(chat_id),
-            parse_mode='Markdown'
-        )
-    elif query.data.startswith("copy_user_"):
-        user_id = query.data.replace("copy_user_", "")
-        query.edit_message_text(
-            "✅ *User ID berhasil ditampilkan!*\n\n"
-            "👤 User ID: `{}`\n\n"
-            "_Tekan dan tahan pada ID di atas untuk copy_".format(user_id),
-            parse_mode='Markdown'
-        )
+    # Kirim pesan terpisah untuk kemudahan copy
+    update.message.reply_text("Chat ID: {}".format(chat_id))
+    update.message.reply_text("User ID: {}".format(user_id))
 
 def text_message(bot, update):
     """Handle text messages"""
@@ -97,9 +72,6 @@ def main():
     dp.add_handler(CommandHandler("mulai", start_command))
     dp.add_handler(CommandHandler("bantuan", help_command))
     dp.add_handler(CommandHandler("chatid", chatid_command))
-    
-    # Callback query handler untuk tombol
-    dp.add_handler(CallbackQueryHandler(button_callback))
     
     # Text message handler
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, text_message))
